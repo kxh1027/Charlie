@@ -1,0 +1,339 @@
+---
+title: "Data Report of Forest Fires in Brazil"
+author: "Xinhe Kang"
+date: "2020/2/21"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+setwd("D:/learning/files/Forecasting and Advanced BA/Practical 4/FABA-S4-Data")
+
+data <- read.csv("ForestFireBrazil.csv", header = T)
+```
+
+
+## Data Pre-Processing
+
+Packages needed:
+
+```{r package, echo=TRUE}
+library(ggplot2)
+library(RColorBrewer)
+library(dplyr)
+library(forecast)
+library(plotly)
+```
+
+
+At the very beginning, it is necessary to check and clean the data. It is found that the line 3309 to 3347 contains invalid names of states, so we just remove them from the dataset.
+
+```{r cleanning, echo=TRUE}
+data <- data[-c(3109:3347), ]
+str(data)
+summary(data)
+```
+
+We can learn some basic information about this dataset, such as the type of values and statistics. It
+is important to note that the numbers are imported as factors, so they need to be converted into numeric values in order to calculate:
+
+```{r include=FALSE}
+data$number <- as.integer(as.numeric(as.character(data$number)))
+```
+
+
+## Relationship Visualization
+
+In this part, we are exploring the relationship between the number of forest fires and either year, state or month.
+
+### Relationship between number and state
+
+Since this dataset is inappropriately ordered, if we want to analyze the relationship between two variables, it is essential to rearrange it using for loop.
+
+```{r st_num, echo=TRUE}
+st_num <- data.frame(No = c(1:22),
+                     state = unique(data$state),
+                     number = rep(0, 22))
+head(st_num, 6)
+
+for (i in 1:22) {
+  f <- filter(data, data$state == st_num$state[i])
+  s <- sum(f$number)
+  st_num$number[i] <- s
+}
+head(st_num, 6)
+```
+
+We first create an empty data frame with three columns, in which all of the numbers are 0. Then we write a for loop to aggregate all of the values of each state in Brazil and assign each outcome to the relevant location.
+
+Then let's make a plot.
+
+```{r plot1, echo=FALSE}
+windowsFonts(CA=windowsFont("Calibri")) # Font
+mytheme<-theme_bw() +
+         theme(legend.position="top",
+               panel.border=element_blank(),
+               panel.grid.major=element_line(linetype="dashed"),
+               panel.grid.minor=element_blank(),
+               plot.title=element_text(size=15,
+                                       family="CA"),
+               legend.text=element_text(size=9,colour="#003087",
+                                        family="CA"),
+               legend.key=element_blank(),
+               axis.text=element_text(size=10,colour="#003087",
+                                      family="CA"),
+               strip.text=element_text(size=12,colour="#EF0808",
+                                       family="CA"),
+               strip.background=element_blank()) +
+         theme(plot.title = element_text(size = 20, hjust = 0.5,face="italic")) + 
+         theme(axis.title=element_text(face="italic"))
+p <- ggplot(mapping = aes(x = st_num$No, y = st_num$number), data = st_num)
+p <- p + geom_bar(fill = st_num$No, stat = "identity")
+p <- p + xlab("No of States") + ylab("Number of Forest Fires")
+p <- p + ggtitle("Relationship between Numbers and States")
+p <- p + mytheme
+p
+```
+
+From this scatter plot, it could be found that Mato Grosso (No.11) has the largest number of forest fire (96178) in total, followed by Paraiba (No.14, 52432), Sao Paulo (No.21, 51118),and Rio (No.17, 45160). Relatively less forest fires happened in Sergipe (No.22, 3237), Distrito Federal (No.7, 3561) and Alagoas (No.2, 4644).
+
+
+### Relation between numbers and months
+
+Silimarly, before exploring the relationship between numbers and months, we need create an empty data frame to store data. However, it is important to note that we also need to define the levels of factors in both the data and the empty data frame we just create, or the months will be in alphabetical order. Then we create another for loop.
+
+```{r mo_num, echo=TRUE}
+mo_num <- data.frame(month = c("January", "Feburary", "March", "April", "May", "June", 
+                               "July", "August", "September", "October", "November", 
+                               "December"),
+                     number = rep(0, 12))
+mo_num$month <- factor(mo_num$month,
+                       levels = c("January", "Feburary", "March", "April", "May", "June", 
+                                  "July", "August", "September", "October", "November", 
+                                  "December"))
+
+data$month <- factor(data$month,
+                     levels = c("January", "Feburary", "March", "April", "May", "June", 
+                                "July", "August", "September", "October", "November", 
+                                "December"))
+
+for (i in 1:12) {
+  f <- filter(data, data$month == mo_num$month[i])
+  s <- sum(f$number)
+  mo_num$number[i] <- s
+}
+head(mo_num)
+```
+
+Let's make a plot.
+
+```{r plot2, echo=FALSE}
+q <- ggplot(mapping = aes(x = mo_num$month, y = mo_num$number, group = 1), data = mo_num)
+q <- q + geom_point(pch = 19, cex = 3, shape = 2, colour = rainbow(12))
+q <- q + geom_line(linetype = "dashed", size = 0.5, colour = "orange")
+q <- q + xlab("Month") + ylab("Number of Forest Fire")
+q <- q + ggtitle("Relationship between Numbers and Months")
+q <- q + mytheme
+q
+```
+
+The seasonal trend is obvious in this plot. Less fire occurs from Feburary to May, and most fire happens in July, August, October and November. However, September has a relatively low number of forest fire. This author guesses it is either because of the data has some incorrect values, or because of the climate.
+
+### Relationship between years
+
+Following the previous steps, we can do this easily.
+
+```{r ye_num, echo=TRUE}
+ye_num <- data.frame(year = unique(data$year),
+                     number = rep(0, 20))
+
+for (i in 1:20) {
+  f <- filter(data, data$year == ye_num$year[i])
+  s <- sum(f$number)
+  ye_num$number[i] <- s
+}
+head(ye_num)
+```
+
+Let's make a plot.
+
+```{r plot3, echo=FALSE}
+g <- ggplot(mapping = aes(x = ye_num$year, y = ye_num$number, group = 1), data = ye_num)
+g <- g + geom_point(colour = rainbow(20), pch = 19, cex = 3)
+g <- g + geom_line(linetype = "dashed", size = 0.5, colour = "orange")
+g <- g + xlab("Year") + ylab("Number of Forest Fires")
+g <- g + ggtitle("Relationship between Numbers and Years")
+g <- g + mytheme
+g
+```
+
+We can also find a cyclical trend in this plot, and the entire trend goes up.
+
+
+## Time Seires
+
+We choose Mato Grosso to analyze, which has the largest amount of forest fires.
+
+```{r mat, include=FALSE}
+data <- data[-5]
+mat <- filter(data, data$state == "Mato Grosso")
+```
+
+Then we create an empty data frame which consists of year and twelve months (13 columns in total). Remember to convert the names into factors.
+
+```{r echo=TRUE}
+matts <- data.frame(year = c(1998:2017),
+                    January = rep(0),
+                    Feburary = rep(0),
+                    March = rep(0),
+                    April = rep(0),
+                    May = rep(0),
+                    June = rep(0),
+                    July = rep(0),
+                    August = rep(0),
+                    September = rep(0),
+                    October = rep(0),
+                    November = rep(0),
+                    December = rep(0))
+colnames(matts) <- factor(colnames(matts))
+rownames(matts) <- factor(rownames(matts))
+head(matts)
+```
+
+Next, let's use a for loop to assign each value.
+
+```{r echo=TRUE}
+for (i in 1:20) {
+  for (j in 1:12) {
+    temp <- filter(mat, mat$year == matts$year[i])
+    mo <- filter(temp, temp$month == colnames(matts)[j+1])
+    matts[i, j+1] <- sum(mo$number)
+  }
+}
+head(matts)
+```
+```{r include=FALSE}
+matts2 <- data.frame(Numbers = rep(0, 240))
+matts2$Numbers[1:12] <- matts[1, 2:13]
+matts2$Numbers[13:24] <- matts[2, 2:13]
+matts2$Numbers[25:36] <- matts[3, 2:13]
+matts2$Numbers[37:48] <- matts[4, 2:13]
+matts2$Numbers[49:60] <- matts[5, 2:13]
+matts2$Numbers[61:72] <- matts[6, 2:13]
+matts2$Numbers[73:84] <- matts[7, 2:13]
+matts2$Numbers[85:96] <- matts[8, 2:13]
+matts2$Numbers[97:108] <- matts[9, 2:13]
+matts2$Numbers[109:120] <- matts[10, 2:13]
+matts2$Numbers[121:132] <- matts[11, 2:13]
+matts2$Numbers[133:144] <- matts[12, 2:13]
+matts2$Numbers[145:156] <- matts[13, 2:13]
+matts2$Numbers[157:168] <- matts[14, 2:13]
+matts2$Numbers[169:180] <- matts[15, 2:13]
+matts2$Numbers[181:192] <- matts[16, 2:13]
+matts2$Numbers[193:204] <- matts[17, 2:13]
+matts2$Numbers[205:216] <- matts[18, 2:13]
+matts2$Numbers[217:228] <- matts[19, 2:13]
+matts2$Numbers[229:240] <- matts[20, 2:13]
+```
+
+It is time to create a time series data frame
+
+```{r echo=TRUE}
+ts <- ts(matts2, start = c(1998, 1), frequency = 12)
+ts
+```
+
+### Analysis 1: Simple Moving Average
+
+```{r echo=TRUE}
+opar <- par(no.readonly=TRUE)
+par(mfrow=c(2,2))
+plot(ts, main="Raw time series", col = "red", lty = 5)
+plot(ma(ts, 3), main = "Simple Moving Averages (k=3)", col = "blue", lty = 5)
+plot(ma(ts, 7), main = "Simple Moving Averages (k=7)", col = "orange", lty = 5)
+plot(ma(ts, 15), main = "Simple Moving Averages (k=15)", col = "purple", lty = 5)
+par(opar)
+```
+
+### Analysis 2: Visualization
+
+```{r echo=TRUE}
+monthplot(ts, ylab = "", col = "chocolate3", lty = 3, lwd = 1)
+title(main="Month Plot", font.main=4)
+```
+
+We can see from the plot above that there is large difference on the amount of forest fires among years, but smaller among months. To be specific, on avergae, half of the months remain a stable level of 500 times. September has the lowest number of forest fires, followed by August. Four months (Feb, June, July, December) also remain a stable level of 300 - 400 times.
+
+We choose two subsets to make two seasonal plots (1998-2002 & 2013-2017)
+
+```{r echo=TRUE}
+ts_98_02 <- window(ts, start=c(1998, 1), end=c(2002, 12))
+ts_13_17 <- window(ts, start=c(2013, 1), end=c(2017, 12))
+
+seasonplot(ts_98_02, main = "", xlab = "", ylab = "", 
+           col = c("coral4", "cadetblue1", "chartreuse1", "chocolate1", "brown3"), 
+           lty = 5, lwd = 1, pch = 20, cex = 1)
+title(main="Seasonal Plot of 1998 - 2000", font.main=4)
+legend("topleft", legend = c("1998", "1999", "2000", "2001", "2002"), 
+       col = c("coral4", "cadetblue1", "chartreuse1", "chocolate1", "brown3"), 
+       cex = 0.7, bty = "n", lty = 5, pch = 20)
+
+seasonplot(ts_13_17, main = "", xlab = "", ylab = "", 
+           col = c("aquamarine3", "azure4", "cornflowerblue", "darkred", "darkorchid3"), 
+           lty = 5, lwd = 1, pch = 20, cex = 1)
+title(main="Seasonal Plot of 2013 - 2017", font.main=4)
+legend("topleft", legend = c("2013", "2014", "2015", "2016", "2017"), 
+       col = c("aquamarine3", "azure4", "cornflowerblue", "darkred", "darkorchid3"), 
+       cex = 0.7, bty = "n", lty = 5, pch = 20)
+```
+
+We can summarize from the two plots above that there is some similar seasonal trend between two and three years. For example, similar number of forest fires occurred from January to September in 2001 and 2002. Also, the years of 1998 and 2000 show a similar trend for the whole year. In the second plot, 2013, 2014, 2015 and 2017 all have a higher number of forest firesfrom Feburary to May, and they all go down in June.  
+
+Finally, in order to have a direct insight on the locations of the cities where more forest fires occurred, I chose top 10 cities that have the largest numbers of forest fires, and make a map. Since the package "REmap" cannot be installed in this computer, which is used for automatically getting the locations, I just input the latitudes and longtitudes in person. Moreover, RMarkdown does not support dynamic plots, so I can only assert the picture in the report.
+
+```{r echo=TRUE}
+arr <- arrange(st_num, desc(st_num$number))[1:10,]
+arr <- data.frame(arr,
+                  lat = c(-16.350000, -22.158470, -23.533773, -22.908333,
+                          -11.409874, -21.508900, -16.328547, -19.841644, 
+                          -21.175000, -3.416843),
+                  lon = c(-56.666668, -43.293210, -46.625290, -43.196388,
+                          -41.280857, -43.322800, -48.953403, -43.986511,
+                          -43.017780, -65.856064))
+arr
+g <- list(
+  scope = 'south america',
+  showland = TRUE,
+  landcolor = toRGB("gray85"),
+  subunitwidth = 1,
+  countrywidth = 1,
+  subunitcolor = toRGB("white"),
+  countrycolor = toRGB("white")
+)
+p <- plot_geo(arr, sizes = c(1, 250)) %>%
+  add_markers(
+    x = ~lon, y = ~lat, size = ~number, color = ~number, hoverinfo = "text",
+    text = ~paste(arr$state, ",", arr$number)
+  ) %>%
+  layout(title = 'Top 10 Cities in Brazil', geo = g)
+```
+![](p.png)
+
+
+## Conclusions
+
+1.Mato Grosso, Paraiba, Sao Paulo and Rio need to pay particular attention to the forest fires. There might be some factors and reasons, but they need to come up with effective solutions to all of the problems.
+
+2.Less forest fires occur between January to May, but more in July, Augest, October and November.That might be because it is relatively dry in winter and relatively wet in summer. More emergency solutions need to be arranged in winter, especially in these four months.
+
+3.The trend among years goes up gradually, thus, the government has to focus on this.
+
+
+### That's All. Thanks for Reading!
+
+
+
+
